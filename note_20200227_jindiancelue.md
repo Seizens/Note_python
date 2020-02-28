@@ -1,6 +1,6 @@
 ### 1. 经典的”策略“模式
 
-![](https://github.com/Seizens/TyporaMarkdowmPic/blob/master/20200227/jindiancelue.png)
+![](https://github.com/Seizens/TyporaMarkdowmPic/blob/master/20200227_jindiancelue.png)
 
 《设计模式：可复用面向对象软件的基础》一书是这样概述“策略”模式的：定义一系列算法，把它们一一封装起来，并且使它们可以相互替换。本模式使得算法可以独立于使用它的客户而变化。
 
@@ -109,9 +109,6 @@ class LargeOrderPromo(Promotion):
 使用如下所示：
 
 ```python
-Python 3.6.9 (default, Nov  7 2019, 10:44:02) 
-[GCC 8.3.0] on linux
-Type "help", "copyright", "credits" or "license" for more information.
 >>> from orderpromo import *
 >>> joe = Customer('Joho Doe', 0)
 >>> ann = Customer('Ann Smith', 1100)
@@ -142,3 +139,90 @@ callable(  cart
 <Order total: 42.00 due: 42.00>
 ```
 
+
+
+### 2. 使用函数式实现策略
+
+```python
+from collections import namedtuple
+
+Customer = namedtuple('Customer', 'name fidelity')
+
+class LineItem:
+    def __init__(self, product, quantity, price):
+        self.product = product
+        self.quantity = quantity
+        self.price = price
+
+    def total(self):
+        return self.price * self.quantity
+
+class Order:
+    def __init__(self, customer, cart, promotion=None):
+        self.customer = customer
+        self.cart = list(cart)
+        self.promotion = promotion
+
+    def total(self):
+        if not hasattr(self, '__total'):
+            self.__total = sum(item.total() for item in self.cart)
+        return self.__total
+
+    def due(self):
+        if self.promotion is None:
+            discount = 0
+        else:
+            discount = self.promotion.discount(self)
+        return self.total() - discount
+
+    def __repr__(self):
+        fmt = '<Order total: {:.2f} due: {:.2f}>'
+        return fmt.format(self.total(), self.due())
+
+def fidelity_promo(order):
+    return order.total() * .05 if order.customer.fidelity >1000 else 0
+
+def bulk_item_promo(order):
+    discount = 0
+    for item in order.cart:
+        if item.quantity >= 20:
+            discount += item.total() * .1
+    return discount
+
+def large_order_promo(order):
+    distinct_items = {item.product for item in order.cart}
+    if len(distinct_items) >= 10:
+        return order.total() * .07
+    return 0
+```
+
+使用如下所示：
+
+```python
+>>> from orderfunc import *
+>>> joe = Customer('Joho Doe', 0)
+>>> ann = Customer('Ann Smith', 1100)
+>>> cart = [LineItem('banana', 4, 0.5),
+...     LineItem('apple', 10, 1.5),
+...     LineItem('watermellon', 5, 5.0)]
+>>> Order(joe, cart, fidelity_promo)
+<Order total: 42.00 due: 42.00>
+>>> Order(ann, cart, fidelity_promo)
+<Order total: 42.00 due: 39.90>
+```
+
+### 3. 选择最佳的策略模式
+
+```python
+promos = [fidelity_promo, bulk_item_promo, large_order_promo]
+def best_promo(order):
+    return max(promo(order) for promo in promos)
+```
+
+但是如果新加新的折扣，则无法享受,修改如下
+
+```python
+promos = [globals()[name] for name in globals() if name.endswith('_promo') and name != 'best_promo']
+def best_promo(order):
+    return max(promo(order) for promo in promos)
+```
