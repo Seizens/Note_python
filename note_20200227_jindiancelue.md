@@ -226,3 +226,40 @@ promos = [globals()[name] for name in globals() if name.endswith('_promo') and n
 def best_promo(order):
     return max(promo(order) for promo in promos)
 ```
+
+### 4. 使用装饰器改良策略模式
+
+```python
+promos = []
+def promotion(func):
+    promos.append(func)
+    return func
+
+@promotion
+def fidelity_promo(order):
+    return order.total() * .05 if order.customer.fidelity >1000 else 0
+
+@promotion
+def bulk_item_promo(order):
+    discount = 0
+    for item in order.cart:
+        if item.quantity >= 20:
+            discount += item.total() * .1
+    return discount
+
+@promotion
+def large_order_promo(order):
+    distinct_items = {item.product for item in order.cart}
+    if len(distinct_items) >= 10:
+        return order.total() * .07
+    return 0
+
+def best_promo(order):
+    return max(promo(order) for promo in promos)
+```
+
+(1) 促销策略函数无需使用特殊的名称（即不用以_promo结尾）。
+
+(2) @promotion装饰器突出了被装饰的函数的作用，还便于临时禁用某个促销策略：只需把装饰器注释掉。
+
+(3) 促销折扣策略可以在其他模块中定义，在系统中的任何地方都行，只要使用@promotion装饰即可。
